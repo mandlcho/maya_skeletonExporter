@@ -7,67 +7,72 @@
 #   and its transform nodess and 
 #   writes it to a JSON file.    
 # ==================================== #
-import os
-import re
-import json
+
+# pseudo code :
+# get selection of bones in the scene. 
+# select hierarchy of bones 
+# get bone transforms
+# select dir to save JSON
+# write to JSON
+
 import pymel.core as pm 
+import json
+import re
+import os
 
-keyBoneList = []
+boneList = []
 
-def exportBones(selBones=None,fileName=None):
-    '''
-    Exports List of Bones and its transforms to JSON
-    '''
-    global keyBoneList
-    # first let's make sure a bone is selected 
-    if not selBones:
-        # look for the Dummy_Root bone
-        selection = pm.ls(regex= '.+:Dummy_Root', type="joint")
-        
-        # once the Dummy_Root bone is found, cycle through it
-        for eachBone in selection:
-    		# and select the Dummy_Root, and all its children,
-    	    pm.select(eachBone, hierarchy=True)
-    		# and storing it into a listType. 
-            selectedBones = pm.ls(selection=True)
-            keyBoneList.append(eachBone)
-                        
-    # check if fileName is provided 
-    if not fileName:
-        # then bring up a file dialog
-        basicFilter = "*.json"
-        # and store whatever we selected in returnValue
-        returnValue = pm.fileDialog2(dialogStyle=2, fm=0)
-        if returnValue != None:
-            file, ext = os.path.splitext(returnValue[0])
-            # check if extension is not *.json, append it to filename
-            if ext != ".json":
-                fileName = file+".json"
-            else:
-                fileName = returnValue[0]
-    print fileName
+def storeBones():
+	global boneList
+	# ensuring that no objects are selected
+	pm.select(clear=True)
+	# creating a pattern to look for our specified bone, selected   
+	scnBones = pm.ls(regex= '.+:Dummy_Root', type="joint")
+	# doing a check to see if we managed to get the Dummy_Root bone 
+	for oRoot in scnBones:
+		print oRoot
+		# select the Dummy_Root, and all its children, and storing it into a variable
+		storedBones = pm.select(oRoot, hierarchy=True)
 
-    
-    # gather information about the bones
-    boneName = pm.ls(selection=True)
-    frameStart = pm.playbackOptions(q=True, min=True)
-    frameEnd = pm.playbackOptions(q=True, max=True)
-    for txform in boneName:
-        outData = {
-                    "BoneName":txform,
-                    "transforms":{"matrix_world":{}}
-                  }
-    # loop over all the selected bones in the scene
-    for i in range(len(keyBoneList)):
-        # set the current frame
-        outData["transforms"]["matrix_world"][str(i)]= pm.xform(str(keyBoneList), q=True, matrix=True)
-    
-    
-    # store that data. 
-    fout = open(fileName,"w")
-    json.dumps(outData,fout,indent=2)
-    fout.close()
-    
-    print "exported successfully to %s" % fileName
-        
-exportBones()
+	# storing selection to a variable
+	stored = pm.ls(selection=True)
+	boneList[:] = []
+	for eachBone in stored:
+		boneList.append(eachBone)
+		print " %s has been added to list!" % eachBone	
+	
+	return boneList
+
+def writejson():
+	bonejson = {}
+	selected_obj = pm.ls(sl=True, type='transform')
+
+	basicFilter = "*.json"
+	returnValue = pm.fileDialog2(dialogStyle=2, fm=0)
+	if returnValue != None:
+		file, ext = os.path.splitext(returnValue[0])
+		if ext != ".json":
+			fileName = file+".json"
+		else:
+			fileName = returnValue[0]
+
+	for curr_obj in selected_obj:
+		rotation = pm.xform(curr_obj,  query=True, rotation=True, worldSpace=False)
+		rotation_worldspace = pm.xform(curr_obj,  query=True, rotation=True, worldSpace=True)
+		translation = pm.xform(curr_obj, query=True, translation=True, worldSpace=False)
+		translation_worldspace = pm.xform(curr_obj, query=True, translation=True, worldSpace=True)
+		node = {
+			'translation': str(round(translation[0],2)) + ',' + str(round(translation[1],2)) + ',' + str(round(translation[2],2)),
+			'translation_worldspace': str(round(translation_worldspace[0],2)) + ',' + str(round(translation_worldspace[1],2)) + ',' + str(round(translation_worldspace[2],2)),
+			'rotation': str(round(rotation[0],2)) + ',' + str(round(rotation[1],2)) + ',' + str(round(rotation[2],2)),
+			'rotation_worldspace': str(round(rotation_worldspace[0],2)) + ',' + str(round(rotation_worldspace[1],2)) + ',' + str(round(rotation_worldspace[2],2)),
+		}
+		bonejson[str(curr_obj)] = node
+
+		f = open(fileName, 'w')
+		output_json = json.dump(bonejson, f, sort_keys=True, indent=4, separators=(',', ' : '))
+		f.close()
+	print output_json
+
+storeBones()
+writejson()
